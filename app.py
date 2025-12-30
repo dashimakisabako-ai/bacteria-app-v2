@@ -1,99 +1,56 @@
 import streamlit as st
 import google.generativeai as genai
-import os
+import importlib.metadata
 
-# ---------------------------------------------------------
-# 1. デザイン設定
-# ---------------------------------------------------------
-st.set_page_config(
-    page_title="BactoEtymology AI",
-    page_icon="🧫",
-    layout="centered"
-)
+st.title("🛠 アプリ診断モード")
 
-st.markdown("""
-    <style>
-    .stApp {
-        background-color: #F0F4F8;
-    }
-    h1 {
-        color: #2C3E50;
-        font-family: 'Helvetica Neue', sans-serif;
-    }
-    .stTextInput > label {
-        color: #16A085;
-        font-weight: bold;
-    }
-    .stButton > button {
-        background-color: #2980B9;
-        color: white;
-        border-radius: 5px;
-    }
-    .stMarkdown h2 {
-        color: #27AE60;
-        border-bottom: 2px solid #BDC3C7;
-        padding-bottom: 5px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# ---------------------------------------------------------
-# 2. AIの設定
-# ---------------------------------------------------------
-# システム指示
-SYSTEM_PROMPT = """
-あなたは細菌学と古典言語（ラテン語・ギリシャ語）の専門家です。
-ユーザーが入力した「細菌名（学名）」に対して、以下の構造で解説を出力してください。
-臨床検査技師にとって有益な、科学的かつ教育的なトーンを維持してください。
-
-出力フォーマット:
-## 1. 語源解剖 (Etymological Breakdown)
-学名をパーツに分解し、それぞれのラテン語・ギリシャ語の語源と意味を箇条書きで解説してください。
-（例：Staphylococcus -> Staphyle（ブドウの房）+ kokkos（球））
-
-## 2. 名前の意味 (Literal Meaning)
-その名前が直訳するとどういう意味になるか。
-
-## 3. 臨床的特徴のヒント (Clinical Context)
-名前が示唆する菌の形態や特徴について簡潔に。
-
-## 4. 豆知識 (Did you know?)
-その菌に関する興味深い歴史的背景やトリビアを1つ。
-"""
-
-# APIキーの読み込み
+# 1. ライブラリのバージョン確認
 try:
-    # Streamlit CloudのSecretsから読み込み
-    if "GEMINI_API_KEY" in st.secrets:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-except:
-    pass
-
-# ---------------------------------------------------------
-# 3. アプリの画面構成
-# ---------------------------------------------------------
-st.title("🧫 Bacterial Nomenclature AI")
-st.markdown("細菌名の**語源と由来**を解析する専門ツール")
-
-bacterium_name = st.text_input("細菌名を入力 (例: Staphylococcus aureus)", "")
-
-if st.button("由来を解析する"):
-    if not bacterium_name:
-        st.warning("細菌名を入力してください。")
+    version = importlib.metadata.version("google-generativeai")
+    st.write(f"📦 インストールされているライブラリのバージョン: **{version}**")
+    
+    # バージョンが 0.3.0 などの古いものだと動きません。
+    # 0.8.3 以上になっているか確認します。
+    if version < "0.7.0":
+        st.error("❌ バージョンが古すぎます。requirements.txt が正しく読み込まれていません。")
     else:
+        st.success("✅ バージョンはOKです。")
+        
+except Exception as e:
+    st.error(f"ライブラリのバージョン確認エラー: {e}")
+
+# 2. APIキーの確認
+api_key = st.secrets.get("GEMINI_API_KEY", "")
+st.write("🔑 APIキーの状態確認:")
+if not api_key:
+    st.error("❌ APIキーが読み込めていません。Secretsの設定を確認してください。")
+else:
+    # キーの先頭5文字だけ表示して確認（全部は表示しません）
+    mask_key = api_key[:5] + "..."
+    st.info(f"読み込まれたキー: {mask_key} (文字数: {len(api_key)})")
+    
+    # キーの形式チェック
+    if not api_key.startswith("AIza"):
+        st.warning("⚠️ 注意: Google AI Studioのキーは通常 'AIza' で始まります。")
+
+# 3. 使えるモデルの一覧を取得（これができれば通信成功）
+if st.button("使用可能なモデル一覧を取得"):
+    if api_key:
+        genai.configure(api_key=api_key)
         try:
-            # 【修正点】モデルを安定版の 'gemini-pro' に変更
-            model = genai.GenerativeModel("gemini-pro")
+            st.write("通信テスト中...")
+            models = genai.list_models()
+            found_models = []
+            for m in models:
+                if 'generateContent' in m.supported_generation_methods:
+                    found_models.append(m.name)
             
-            # 【修正点】システム指示をプロンプト本文に結合して送信（これでエラー回避）
-            full_prompt = SYSTEM_PROMPT + "\n\nユーザーの入力した菌名: " + bacterium_name
-            
-            with st.spinner("文献を検索中..."):
-                response = model.generate_content(full_prompt)
-            
-            st.success("解析完了")
-            st.markdown(response.text)
+            st.success("✅ 通信成功！以下のモデルが使用可能です：")
+            st.json(found_models)
             
         except Exception as e:
-            st.error(f"エラーが発生しました: {e}")
-            st.info("APIキーの設定を確認してください。")
+            st.error("❌ 通信エラー発生")
+            st.code(e)
+            st.write("↑このエラーメッセージが原因の正体です。")
+    else:
+        st.error("APIキーがないためテストできません。")
