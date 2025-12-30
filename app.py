@@ -20,9 +20,11 @@ st.markdown("""
 # ---------------------------------------------------------
 # AI設定
 # ---------------------------------------------------------
+# 専門家としての役割設定
 SYSTEM_PROMPT = """
 あなたは細菌学と古典言語（ラテン語・ギリシャ語）の専門家です。
 ユーザーが入力した「細菌名（学名）」に対して、以下の構造で解説を出力してください。
+臨床検査技師にとって有益な、科学的かつ教育的なトーンを維持してください。
 
 出力フォーマット:
 ## 1. 語源解剖 (Etymological Breakdown)
@@ -49,10 +51,6 @@ if api_key:
 st.title("🧫 Bacterial Nomenclature AI")
 st.markdown("細菌名の**語源と由来**を解析する専門ツール")
 
-# 現在の状況を表示（デバッグ用）
-if api_key:
-    st.caption(f"🔑 APIキー認識済み (末尾: ...{api_key[-4:]})")
-
 bacterium_name = st.text_input("細菌名を入力 (例: Staphylococcus aureus)", "")
 
 if st.button("由来を解析する (Analyze)"):
@@ -61,20 +59,20 @@ if st.button("由来を解析する (Analyze)"):
     elif not bacterium_name:
         st.warning("細菌名を入力してください。")
     else:
-        # プロンプト結合
-        full_prompt = SYSTEM_PROMPT + "\n\nユーザー入力: " + bacterium_name
-        
         try:
-            with st.spinner("解析中 (Gemini Pro)..."):
-                # 【変更点】ここを 'gemini-pro' に固定しました
-                # 1.5-flash が 404 でも、これなら通ることが多いです
-                model = genai.GenerativeModel("gemini-pro")
+            # ★ここを最新モデルに戻しました！新しい鍵ならこれで動きます★
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            
+            # プロンプト結合
+            full_prompt = SYSTEM_PROMPT + "\n\nユーザー入力: " + bacterium_name
+            
+            with st.spinner("文献を検索中 (Gemini 1.5 Flash)..."):
                 response = model.generate_content(full_prompt)
-                
-                st.success("解析完了")
-                st.markdown(response.text)
-
+            
+            st.success("解析完了")
+            st.markdown(response.text)
+            
         except Exception as e:
             st.error("エラーが発生しました。")
             st.code(e)
-            st.warning("ヒント: これでもエラーが出る場合のみ、APIキーの作り直しが必要です。")
+            st.info("ヒント: Streamlit右上の『Reboot app』を押して更新を反映させてください。")
