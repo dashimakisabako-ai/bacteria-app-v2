@@ -49,9 +49,9 @@ if api_key:
 st.title("🧫 Bacterial Nomenclature AI")
 st.markdown("細菌名の**語源と由来**を解析する専門ツール")
 
-# ★現在のAPIキーの先頭を表示して、更新されたか確認できるようにします
+# 現在の状況を表示（デバッグ用）
 if api_key:
-    st.caption(f"現在のキー: {api_key[:6]}... (Rebootで更新されます)")
+    st.caption(f"🔑 APIキー認識済み (末尾: ...{api_key[-4:]})")
 
 bacterium_name = st.text_input("細菌名を入力 (例: Staphylococcus aureus)", "")
 
@@ -64,25 +64,17 @@ if st.button("由来を解析する (Analyze)"):
         # プロンプト結合
         full_prompt = SYSTEM_PROMPT + "\n\nユーザー入力: " + bacterium_name
         
-        # ★エラー回避の「二段構え」ロジック
         try:
-            with st.spinner("解析中 (Gemini 1.5 Flash)..."):
-                # まずは最新のFlashでトライ
-                model = genai.GenerativeModel("gemini-1.5-flash")
+            with st.spinner("解析中 (Gemini Pro)..."):
+                # 【変更点】ここを 'gemini-pro' に固定しました
+                # 1.5-flash が 404 でも、これなら通ることが多いです
+                model = genai.GenerativeModel("gemini-pro")
                 response = model.generate_content(full_prompt)
-                st.success("解析完了 (1.5 Flash)")
+                
+                st.success("解析完了")
                 st.markdown(response.text)
 
-        except Exception as e_flash:
-            # FlashがダメならProで再トライ（自動バックアップ）
-            try:
-                with st.spinner(f"Flashモデルが応答しないため、安定版(Pro)に切り替えています..."):
-                    model = genai.GenerativeModel("gemini-pro")
-                    response = model.generate_content(full_prompt)
-                    st.success("解析完了 (Proモデルで実行)")
-                    st.markdown(response.text)
-            except Exception as e_pro:
-                # どっちもダメならエラー表示
-                st.error("エラーが発生しました。")
-                st.write(f"詳細: {e_flash}")
-                st.info("ヒント: Streamlit右上の『Reboot app』を必ず押してください。")
+        except Exception as e:
+            st.error("エラーが発生しました。")
+            st.code(e)
+            st.warning("ヒント: これでもエラーが出る場合のみ、APIキーの作り直しが必要です。")
